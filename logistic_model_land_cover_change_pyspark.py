@@ -10,7 +10,7 @@ Spyder Editor.
 #
 #AUTHORS: Benoit Parmentier
 #DATE CREATED: 01/07/2019
-#DATE MODIFIED: 04/18/2019
+#DATE MODIFIED: 05/06/2019
 #Version: 1
 #PROJECT: AAG 2019 Geospatial Short Course
 #TO DO:
@@ -51,8 +51,6 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
-
-
 from pyspark.ml.classification import LogisticRegression
 from pyspark import SparkContext
 from pyspark.sql import SQLContext
@@ -100,7 +98,9 @@ random_seed = 100 #random seed for reproducibility
 
 
 ## seting up SPARK
-sc= SparkContext()
+#sc= SparkContext()
+#import findspark as fs
+#fs.init()
 sc = SparkContext.getOrCreate()
 sqlContext = SQLContext(sc)
 
@@ -128,6 +128,7 @@ data_df.head()
 ################
 ##### Step 1: Prepare categorical features/covariates by rescaling values
 
+
 ## Relevant variables used:
 selected_covariates_names = ['land_cover', 'slope', 'roads_dist', 'developped_dist']
 selected_target_names = ['change'] #also called dependent variable
@@ -142,21 +143,55 @@ values_cat = array(data_df[selected_categorical_var_names].values) #note this is
 
 label_encoder = LabelEncoder()  # labeling categories
 one_hot_encoder = OneHotEncoder(sparse=False) #generate dummy variables
+
+#https://docs.databricks.com/spark/latest/mllib/binary-classification-mllib-pipelines.html
+
+from pyspark.ml import Pipeline
+from pyspark.ml.feature import OneHotEncoderEstimator, StringIndexer, VectorAssembler
+categoricalColumns = ["workclass", "education", "marital_status", "occupation", "relationship", "race", "sex", "native_country"]
+stages = [] # stages in our Pipeline
+for categoricalCol in categoricalColumns:
+    # Category Indexing with StringIndexer
+    stringIndexer = StringIndexer(inputCol=categoricalCol, outputCol=categoricalCol + "Index")
+    # Use OneHotEncoder to convert categorical variables into binary SparseVectors
+    # encoder = OneHotEncoderEstimator(inputCol=categoricalCol + "Index", outputCol=categoricalCol + "classVec")
+    encoder = OneHotEncoderEstimator(inputCols=[stringIndexer.getOutputCol()], outputCols=[categoricalCol + "classVec"])
+    # Add stages.  These are not run here, but will run all at once later on.
+    stages += [stringIndexer, encoder]
+    
+
 ### First integer encode:
 integer_encoded = label_encoder.fit_transform(values_cat)
+
+from pyspark.ml.feature import OneHotEncoderEstimator
+
+df = spark.createDataFrame([
+    (0.0, 1.0),
+    (1.0, 0.0),
+    (2.0, 1.0),
+    (0.0, 2.0),
+    (0.0, 1.0),
+    (2.0, 0.0)
+], ["categoryIndex1", "categoryIndex2"])
+
+encoder = OneHotEncoderEstimator(inputCols=["categoryIndex1", "categoryIndex2"],
+                                 outputCols=["categoryVec1", "categoryVec2"])
+model = encoder.fit(df)
+encoded = model.transform(df)
+encoded.show()
 
 #onehot_encoded[0:5,]
 print(integer_encoded)
 # Binary encode:
 integer_encoded = integer_encoded.reshape(len(integer_encoded),1)
-print(integer_encoded)
+print(iner_encoded)
 
 #33 generate dummy variables
 onehot_encoded = one_hot_encoder.fit_transform(integer_encoded)
 print(onehot_encoded)
 onehot_encoded.shape
 type(onehot_encoded)
-
+teg
 #Check values generated: invert to check value?
 values_cat[0:5,]
 inverted = label_encoder.inverse_transform([np.argmax(onehot_encoded[1,:])])
