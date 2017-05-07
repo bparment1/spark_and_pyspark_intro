@@ -59,6 +59,8 @@ from pyspark.ml.feature import VectorAssembler
 #from pyspark import SparkConf, SparkContext
 #from pyspark.sql import SQLContext
 
+from pyspark.sql import SparkSession
+
 ################ NOW FUNCTIONS  ###################
 
 ##------------------
@@ -101,30 +103,21 @@ random_seed = 100 #random seed for reproducibility
 #sc= SparkContext()
 #import findspark as fs
 #fs.init()
-sc = SparkContext.getOrCreate()
+#spark = SparkSession.builder.appName('Land_change_example').getOrCreate()
+sc = SparkSession.builder.appName('Land_change_example').getOrCreate()
+
+#sc = SparkContext.getOrCreate()
 sqlContext = SQLContext(sc)
 
-######### PART 0: Set up the output dir ################
-
-
-#set up the working directory
-#Create output directory
-
-if create_out_dir==True:
-    out_dir_new = "output_data_"+out_suffix
-    out_dir = os.path.join(out_dir,out_dir_new)
-    create_dir_and_check_existence(out_dir)
-    os.chdir(out_dir)        #set working directory
-else:
-    os.chdir(create_out_dir) #use working dir defined earlier
+######### PART 0: Read in data ################
     
+data_df = sc.read.csv(os.path.join(in_dir,data_fname), 
+                      header=True, inferSchema=True)
 
+data_df.show()
 
-### Let'sdata_df['land_cover'].unique()
-# read in the information that contains variables
-data_df = pd.read_csv(os.path.join(in_dir,data_fname))
-data_df.columns
-data_df.head()
+#schema on read!
+data_df.printSchema()
 
 ################
 ##### Step 1: Prepare categorical features/covariates by rescaling values
