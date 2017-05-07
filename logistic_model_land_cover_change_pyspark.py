@@ -10,7 +10,7 @@ Spyder Editor.
 #
 #AUTHORS: Benoit Parmentier
 #DATE CREATED: 01/07/2019
-#DATE MODIFIED: 05/06/2019
+#DATE MODIFIED: 05/07/2019
 #Version: 1
 #PROJECT: AAG 2019 Geospatial Short Course
 #TO DO:
@@ -76,19 +76,19 @@ def create_dir_and_check_existence(path):
 #####  Parameters and argument set up ########### 
 
 #ARGS 1
-in_dir = "/home/bparmentier/c_drive/Users/bparmentier/Data/python/Exercise_4/data"
-#in_dir = "/nfs/public-data/training"
+in_dir = "/home/bparmentier/c_drive/Users/bparmentier/Data/python/pyspark/data"
 #ARGS 2
-out_dir = "/home/bparmentier/c_drive/Users/bparmentier/Data/python/Exercise_4/outputs"
+out_dir = "/home/bparmentier/c_drive/Users/bparmentier/Data/python/pyspark/outputs"
 #out_dir = "/home/participant32"
 #out_dir = "/resarch-home/bparmentier"
-
+#in_dir = "/nfs/public-data/training"
+#
 #ARGS 3:
 create_out_dir=True #create a new ouput dir if TRUE
 #ARGS 4
-out_suffix = "exercise4_04112019" #output suffix for the files and ouptut folder
+out_suffix = "pyspark_application_land_change_05072019" #output suffix for the files and ouptut folder
 #ARGS 5
-data_fname = 'r_variables_harris_county_exercise4_02072019.txt'
+data_fname = 'r_variables_harris_county_land_change_modeling_05072019.txt'
 #ARGS 19
 prop = 0.3 #proportion of observations for hold-out/testing
 #ARGS 20
@@ -120,7 +120,8 @@ else:
     
 
 
-### Let's read in the information that contains variables
+### Let'sdata_df['land_cover'].unique()
+# read in the information that contains variables
 data_df = pd.read_csv(os.path.join(in_dir,data_fname))
 data_df.columns
 data_df.head()
@@ -146,68 +147,25 @@ one_hot_encoder = OneHotEncoder(sparse=False) #generate dummy variables
 
 #https://docs.databricks.com/spark/latest/mllib/binary-classification-mllib-pipelines.html
 
+
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import OneHotEncoderEstimator, StringIndexer, VectorAssembler
-categoricalColumns = ["workclass", "education", "marital_status", "occupation", "relationship", "race", "sex", "native_country"]
+#categoricalColumns = ["workclass", "education", "marital_status", "occupation", "relationship", "race", "sex", "native_country"]
+
+selected_categorical_var_names=['land_cover']
 stages = [] # stages in our Pipeline
-for categoricalCol in categoricalColumns:
+    
+for catCol in selected_categorical_var_names:
     # Category Indexing with StringIndexer
-    stringIndexer = StringIndexer(inputCol=categoricalCol, outputCol=categoricalCol + "Index")
+    stringIndexer = StringIndexer(inputCol=catCol, 
+                                  outputCol=catCol + "Index")
     # Use OneHotEncoder to convert categorical variables into binary SparseVectors
     # encoder = OneHotEncoderEstimator(inputCol=categoricalCol + "Index", outputCol=categoricalCol + "classVec")
-    encoder = OneHotEncoderEstimator(inputCols=[stringIndexer.getOutputCol()], outputCols=[categoricalCol + "classVec"])
+    encoder = OneHotEncoderEstimator(inputCols=[stringIndexer.getOutputCol()], 
+                                     outputCols=[catCol + "classVec"])
     # Add stages.  These are not run here, but will run all at once later on.
     stages += [stringIndexer, encoder]
     
-
-### First integer encode:
-integer_encoded = label_encoder.fit_transform(values_cat)
-
-from pyspark.ml.feature import OneHotEncoderEstimator
-
-df = spark.createDataFrame([
-    (0.0, 1.0),
-    (1.0, 0.0),
-    (2.0, 1.0),
-    (0.0, 2.0),
-    (0.0, 1.0),
-    (2.0, 0.0)
-], ["categoryIndex1", "categoryIndex2"])
-
-encoder = OneHotEncoderEstimator(inputCols=["categoryIndex1", "categoryIndex2"],
-                                 outputCols=["categoryVec1", "categoryVec2"])
-model = encoder.fit(df)
-encoded = model.transform(df)
-encoded.show()
-
-#onehot_encoded[0:5,]
-print(integer_encoded)
-# Binary encode:
-integer_encoded = integer_encoded.reshape(len(integer_encoded),1)
-print(iner_encoded)
-
-#33 generate dummy variables
-onehot_encoded = one_hot_encoder.fit_transform(integer_encoded)
-print(onehot_encoded)
-onehot_encoded.shape
-type(onehot_encoded)
-teg
-#Check values generated: invert to check value?
-values_cat[0:5,]
-inverted = label_encoder.inverse_transform([np.argmax(onehot_encoded[1,:])])
-print(inverted)
-
-#assign back to the data.frame
-unique_val = np.array(freq_val_df.index)
-unique_val = np.sort(unique_val)
-print(unique_val)
-names_cat = ['lc_' + str(i) for i in unique_val]
-print(names_cat)
-onehot_encoded_df = pd.DataFrame(onehot_encoded,columns=names_cat)
-onehot_encoded_df.columns
-onehot_encoded_df.head()
-onehot_encoded_df.shape
-data_df.shape
 
 ## Add the new encoded variables to the data frame
 data_df= pd.concat([data_df,onehot_encoded_df],sort=False,axis=1)
