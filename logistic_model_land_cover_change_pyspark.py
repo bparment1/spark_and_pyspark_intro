@@ -172,40 +172,31 @@ stages += [label_stringIdx]
 ##############
 ## Step 2: Split training and testing and rescaling for continuous variables
 
-X_train, X_test, y_train, y_test = train_test_split(data_df[selected_covariates_names_updated], 
-                                                    data_df[selected_target_names], 
-                                                    test_size=prop, 
-                                                    random_state=random_seed)
-X_train.shape
-X_train.head()
+training_df, test_df = data_df.randomSplit([1-prop,prop],seed=random_seed)
+
+#https://medium.com/@dhiraj.p.rai/logistic-regression-in-spark-ml-8a95b5f5434c
+
+
+### NEEED SCALING NOW
 
 #### Scaling between 0-1 for continuous variables
 # Data needs to be scaled to a small range like 0 to 1 for the neural
 # network to work well.
-scaler = MinMaxScaler(feature_range=(0, 1))
-### need to select only the continuous var:
-scaled_training = scaler.fit_transform(X_train[selected_continuous_var_names])
-scaled_testing = scaler.transform(X_test[selected_continuous_var_names])
-type(scaled_training) # array
-scaled_training.shape
 
-## Concatenate column-wise
-X_testing_df = pd.DataFrame(np.concatenate((X_test[names_cat].values,scaled_testing),axis=1),
-                                            columns=names_cat+selected_continuous_var_names)
+vectorAssembler = VectorAssembler(inputCols = selected_covariates_names_updated, 
+                                  outputCol = 'features')
+vtraining_df = vectorAssembler.transform(training_spark_df)
 
-X_training_df = pd.DataFrame(np.concatenate((X_train[names_cat].values,scaled_training),axis=1),
-                                            columns=names_cat+selected_continuous_var_names)
+from pyspark.ml.feature import StandardScaler
+standardscaler=StandardScaler().setInputCol("features").setOutputCol("Scaled_features")
+standardscaler=standardscaler.fit(training_df)
+training_df = standardscaler.transform(training_df)
+testing_df=standardscaler.transform(tesing_df)
 
-X_training_df.head()
+#raw_data.select("features","Scaled_features").show(5)
 
 ###########################################
 ### PART IV: Run model and perform assessment ###########################
-
-####################
-###### Step 1: fit glm logistic model and generate predictions
-
-X_y_training_df = pd.DataFrame(np.concatenate((X_training_df.values,y_train),axis=1),
-                                            columns=list(X_training_df)+['change'])
 
 training_spark_df = sqlContext.createDataFrame(X_y_training_df)
 
