@@ -114,12 +114,18 @@ sqlContext = SQLContext(sc)
 data_df = sc.read.csv(os.path.join(in_dir,data_fname), 
                       header=True, inferSchema=True)
 
-data_df.show()
-
+data_df.show(5)
 #schema on read!
 data_df.printSchema()
+data_df.count()
+data_df.columns
+data_df.describe().show()
 
-################
+data_df.groupby('change').count().show()
+data_df.groupby('change').mean('slope').show()
+
+
+################Feature engineering
 ##### Step 1: Prepare categorical features/covariates by rescaling values
 
 
@@ -130,16 +136,13 @@ selected_target_names = ['change'] #also called dependent variable
 ## We need to account for categorical versus continuous variables
 selected_categorical_var_names=['land_cover']
 selected_continuous_var_names=list(set(selected_covariates_names) - set(selected_categorical_var_names))
-##Find frequency of unique values:
-freq_val_df = data_df[selected_categorical_var_names].apply(pd.value_counts)
-print(freq_val_df.head())
-values_cat = array(data_df[selected_categorical_var_names].values) #note this is assuming only one cat val here
 
-label_encoder = LabelEncoder()  # labeling categories
-one_hot_encoder = OneHotEncoder(sparse=False) #generate dummy variables
+##Find frequency of unique values: do this with SQL
+#freq_val_df = data_df[selected_categorical_var_names].apply(pd.value_counts)
+#print(freq_val_df.head())
+#values_cat = array(data_df[selected_categorical_var_names].values) #note this is assuming only one cat val here
 
 #https://docs.databricks.com/spark/latest/mllib/binary-classification-mllib-pipelines.html
-
 
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import OneHotEncoderEstimator, StringIndexer, VectorAssembler
@@ -160,12 +163,11 @@ for catCol in selected_categorical_var_names:
     stages += [stringIndexer, encoder]
     
 
-## Add the new encoded variables to the data frame
-data_df= pd.concat([data_df,onehot_encoded_df],sort=False,axis=1)
-data_df.shape
-data_df.head()
+# Convert label into label indices using the StringIndexer
+label_stringIdx = StringIndexer(inputCol="change", outputCol="label")
+stages += [label_stringIdx]
 
-selected_covariates_names_updated = selected_continuous_var_names + names_cat 
+#selected_covariates_names_updated = selected_continuous_var_names + names_cat 
 
 ##############
 ## Step 2: Split training and testing and rescaling for continuous variables
