@@ -52,9 +52,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 
+
 from pyspark.ml.classification import LogisticRegression
 from pyspark import SparkContext
-sc =SparkContext()
+from pyspark.sql import SQLContext
+
+#from pyspark import SparkConf, SparkContext
+#from pyspark.sql import SQLContext
 
 ################ NOW FUNCTIONS  ###################
 
@@ -123,6 +127,10 @@ prop = 0.3 #proportion of observations for hold-out/testing
 random_seed = 100 #random seed for reproducibility
 
 ################# START SCRIPT ###############################
+
+## seting up SPARK
+sc= SparkContext()
+sqlContext = SQLContext(sc)
 
 ######### PART 0: Set up the output dir ################
 
