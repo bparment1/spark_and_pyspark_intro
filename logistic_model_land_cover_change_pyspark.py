@@ -101,6 +101,11 @@ random_seed = 100 #random seed for reproducibility
 ## seting up SPARK
 sc= SparkContext()
 sqlContext = SQLContext(sc)
+#https://www.guru99.com/pyspark-tutorial.html
+#dataset = pd.read_csv("data/AS/test_v2.csv")
+#sc = SparkContext(conf=conf)
+#sqlCtx = SQLContext(sc)
+#sdf = sqlCtx.createDataFrame(dataset)
 
 ######### PART 0: Set up the output dir ################
 
@@ -158,6 +163,49 @@ freq_val_df = data_df[selected_categorical_var_names].apply(pd.value_counts)
 print(freq_val_df.head())
 values_cat = array(data_df[selected_categorical_var_names].values) #note this is assuming only one cat val here
 
+label_encoder = LabelEncoder()  # labeling categories
+one_hot_encoder = OneHotEncoder(sparse=False) #generate dummy variables
+### First integer encode:
+integer_encoded = label_encoder.fit_transform(values_cat)
+print(integer_encoded)
+# Binary encode:
+integer_encoded = integer_encoded.reshape(len(integer_encoded),1)
+print(integer_encoded)
+
+#33 generate dummy variables
+onehot_encoded = one_hot_encoder.fit_transform(integer_encoded)
+print(onehot_encoded)
+onehot_encoded.shape
+type(onehot_encoded)
+
+#Check values generated: invert to check value?
+onehot_encoded[0:5,]
+values_cat[0:5,]
+inverted = label_encoder.inverse_transform([np.argmax(onehot_encoded[1,:])])
+print(inverted)
+
+#assign back to the data.frame
+unique_val = np.array(freq_val_df.index)
+unique_val = np.sort(unique_val)
+print(unique_val)
+names_cat = ['lc_' + str(i) for i in unique_val]
+print(names_cat)
+onehot_encoded_df = pd.DataFrame(onehot_encoded,columns=names_cat)
+onehot_encoded_df.columns
+onehot_encoded_df.head()
+onehot_encoded_df.shape
+data_df.shape
+
+## Add the new encoded variables to the data frame
+data_df= pd.concat([data_df,onehot_encoded_df],sort=False,axis=1)
+data_df.shape
+data_df.head()
+
+selected_covariates_names_updated = selected_continuous_var_names + names_cat 
+
+##############
+## Step 2: Split training and testing and rescaling for continuous variables
+
 ##############
 ## Step 2: Split training and testing and rescaling for continuous variables
 
@@ -197,33 +245,29 @@ X_y_training_df = pd.DataFrame(np.concatenate((X_training_df.values,y_train),axi
                                             columns=list(X_training_df)+['change'])
 
 training_spark_df = sqlContext.createDataFrame(X_y_training_df)
-
+training_spark_df
 #https://www.guru99.com/pyspark-tutorial.html
 #https://towardsdatascience.com/building-a-linear-regression-with-pyspark-and-mllib-d065c3ba246a
 
-vectorAssembler = VectorAssembler(inputCols = selected_covariates_names, 
+vectorAssembler = VectorAssembler(inputCols = list(X_training_df), 
                                   outputCol = 'features')
 vtraining_df = vectorAssembler.transform(training_spark_df)
+vtraining_df.show(3)
 
-vectorAssembler = VectorAssembler(inputCols = ['CRIM', 'ZN', 'INDUS', 'CHAS', 'NOX', 'RM', 'AGE', 'DIS', 'RAD', 'TAX', 'PT', 'B', 'LSTAT'],
-                                  outputCol = 'features')
-vhouse_df = vectorAssembler.transform(house_df)
-vhouse_df = vhouse_df.select(['features', 'MV'])
-vhouse_df.show(3)
+#vectorAssembler = VectorAssembler(inputCols = ['CRIM', 'ZN', 'INDUS', 'CHAS', 'NOX', 'RM', 'AGE', 'DIS', 'RAD', 'TAX', 'PT', 'B', 'LSTAT'],
+#                                  outputCol = 'features')
+#vhouse_df = vectorAssembler.transform(house_df)
+#vhouse_df = vhouse_df.select(['features', 'MV'])
+#vhouse_df.show(3)
 
 
 from pyspark.ml.regression import LinearRegression
 
-lr = LinearRegression(featuresCol = 'features', labelCol='MV', maxIter=10, regParam=0.3, elasticNetParam=0.8)
+lr = LinearRegression(featuresCol = 'feaes', labelCol='MV', maxIter=10, regParam=0.3, elasticNetParam=0.8)
 lr_model = lr.fit(train_df)
 print("Coefficients: " + str(lr_model.coefficients))
 print("Intercept: " + str(lr_model.intercept))
-
-#https://www.guru99.com/pyspark-tutorial.html
-#dataset = pd.read_csv("data/AS/test_v2.csv")
-#sc = SparkContext(conf=conf)
-sqlCtx = SQLContext(sc)
-sdf = sqlCtx.createDataFrame(dataset)
+tur
 
 # Load training data
 training = spark.read.format("libsvm").load("data/mllib/sample_libsvm_data.txt")
