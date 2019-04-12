@@ -252,6 +252,7 @@ training_spark_df
 vectorAssembler = VectorAssembler(inputCols = list(X_training_df), 
                                   outputCol = 'features')
 vtraining_df = vectorAssembler.transform(training_spark_df)
+vtraining_df = vtraining_df.select(['features', 'change'])
 vtraining_df.show(3)
 
 #vectorAssembler = VectorAssembler(inputCols = ['CRIM', 'ZN', 'INDUS', 'CHAS', 'NOX', 'RM', 'AGE', 'DIS', 'RAD', 'TAX', 'PT', 'B', 'LSTAT'],
@@ -272,65 +273,14 @@ tur
 # Load training data
 training = spark.read.format("libsvm").load("data/mllib/sample_libsvm_data.txt")
 
-lr = LogisticRegression(maxIter=10, regParam=0.3, elasticNetParam=0.8)
-
-featuresCol = 'features', labelCol='MV'
+lr = LogisticRegression(featuresCol='features',labelCol='change',maxIter=10, regParam=0.3, elasticNetParam=0.8)
 
 # Fit the model
-lrModel = lr.fit(training)
-lfModel = lr.fit(X_train.values,y_train.values.ravel())
+lrModel = lr.fit(vtraining_df)
 
-model_logistic = LogisticRegression() #instantiate model object
-model_logistic = model_logistic.fit(X_train.values,y_train.values.ravel())
+print("Coefficients: " + str(lrModel.coefficients))
+print("Intercept: " + str(lrMoodel.intercept))
 
-print("model coefficients: ",model_logistic.coef_)
-selected_covariates_names_updated
-
-pred_test_prob = model_logistic.predict_proba(X_test.values)
-y_scores_test = pred_test_prob[:,1]
-pred_train_prob = model_logistic.predict_proba(X_train.values)
-y_scores_train = pred_train_prob[:,1]
-
-### Note that we only have about 10% change in the dataset so setting 50% does not make sense!!
-sum(data_df.change)/data_df.shape[0]
-sum(y_train.change)/y_train.shape[0]
-sns.set(color_codes=True) #improves layout with bar and background grid
-sns.countplot(x='change',data=data_df)
-plt.show()
-plt.savefig('count_plot')
-
-# Explore values distribution
-f, ax = plt.subplots(1, 2)
-sns.distplot(y_scores_train,ax=ax[0])#title='January residuals')
-sns.distplot(y_scores_test,ax=ax[1])#title='January residuals')
-ax[0].set(title="Predicted training probabilities") 
-ax[1].set(title="Predicted testing probabilities") 
-
-####################
-###### Step 2: Model assessment with ROC and AUC
-
-#Compute AUC
-auc_val_train =roc_auc_score(y_train,y_scores_train)
-auc_val_test =roc_auc_score(y_test,y_scores_test)
-
-print("AUC train: ", auc_val_train)
-print("AUC test: ", auc_val_test)
-
-#Generate inputs for ROC curves
-fpr, tpr, thresholds = roc_curve(y_test, 
-                                 y_scores_test)
-plt.figure()
-plt.plot(fpr, tpr, 
-         label='Logistic Regression (area = %0.2f)' % auc_val_test)
-plt.plot([0, 1], [0, 1],'r--')
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('Test ROC')
-plt.legend(loc="lower right")
-plt.savefig('Log_ROC')
-plt.show()
 
 ###################### END OF SCRIPT #####################
 
