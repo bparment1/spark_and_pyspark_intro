@@ -4,15 +4,16 @@ Spyder Editor.
 """
 #################################### Land Use and Land Cover Change #######################################
 ############################ Analyze Land Cover change in Houston #######################################
-#This script performs analyses to test pyspark g aggregated NLCD values.
+#This script performs analyses to test pyspark to predict land change in Houston.
 #The goal is to assess land cover change using two land cover maps in the Houston areas.
 #Additional datasets are provided for the land cover change modeling. A model is built for Harris county.
+#A logistic model is fitted using ml from pyspark
 #
 #AUTHORS: Benoit Parmentier
 #DATE CREATED: 01/07/2019
-#DATE MODIFIED: 04/11/2019
+#DATE MODIFIED: 04/12/2019
 #Version: 1
-#PROJECT: AAG 2019 Geospatial Short Course
+#PROJECT: Research Support
 #TO DO:
 #
 #COMMIT: changes to modeling
@@ -255,23 +256,7 @@ vtraining_df = vectorAssembler.transform(training_spark_df)
 vtraining_df = vtraining_df.select(['features', 'change'])
 vtraining_df.show(3)
 
-#vectorAssembler = VectorAssembler(inputCols = ['CRIM', 'ZN', 'INDUS', 'CHAS', 'NOX', 'RM', 'AGE', 'DIS', 'RAD', 'TAX', 'PT', 'B', 'LSTAT'],
-#                                  outputCol = 'features')
-#vhouse_df = vectorAssembler.transform(house_df)
-#vhouse_df = vhouse_df.select(['features', 'MV'])
-#vhouse_df.show(3)
-
-
-from pyspark.ml.regression import LinearRegression
-
-lr = LinearRegression(featuresCol = 'feaes', labelCol='MV', maxIter=10, regParam=0.3, elasticNetParam=0.8)
-lr_model = lr.fit(train_df)
-print("Coefficients: " + str(lr_model.coefficients))
-print("Intercept: " + str(lr_model.intercept))
-tur
-
 # Load training data
-training = spark.read.format("libsvm").load("data/mllib/sample_libsvm_data.txt")
 
 lr = LogisticRegression(featuresCol='features',labelCol='change',maxIter=10, regParam=0.3, elasticNetParam=0.8)
 
@@ -279,13 +264,37 @@ lr = LogisticRegression(featuresCol='features',labelCol='change',maxIter=10, reg
 lrModel = lr.fit(vtraining_df)
 
 print("Coefficients: " + str(lrModel.coefficients))
-print("Intercept: " + str(lrMoodel.intercept))
+print("Intercept: " + str(lrModel.intercept))
+
+
+#  File "/usr/local/lib/python3.5/dist-packages/py4j/protocol.py", line 328, in get_return_value
+#    format(target_id, ".", name), value)#
+
+#Py4JJavaError: An error occurred while calling o272.fit.
+#: org.apache.spark.SparkException: Job aborted due to stage failure: Task 0 in stage 2.0 failed 1 times, most recent failure: Lost task 0.0 in stage 2.0 (TID 2, localhost, executor driver): org.apache.spark.api.python.PythonException: Traceback (most recent call last):
+#  File "/usr/local/lib/python3.5/dist-packages/pyspark/python/lib/pyspark.zip/pyspark/worker.py", line 267, in main
+#    ("%d.%d" % sys.version_info[:2], version))
+#Exception: Python in worker has different version 2.7 than that in driver 3.5, PySpark cannot run with different minor versions.
+#Please check environment variables PYSPARK_PYTHON and PYSPARK_DRIVER_PYTHON are correctly set.
 
 
 ###################### END OF SCRIPT #####################
 
 
+#training = spark.read.format("libsvm").load("data/mllib/sample_libsvm_data.txt")
 
+#vectorAssembler = VectorAssembler(inputCols = ['CRIM', 'ZN', 'INDUS', 'CHAS', 'NOX', 'RM', 'AGE', 'DIS', 'RAD', 'TAX', 'PT', 'B', 'LSTAT'],
+#                                  outputCol = 'features')
+#vhouse_df = vectorAssembler.transform(house_df)
+#vhouse_df = vhouse_df.select(['features', 'MV'])
+#vhouse_df.show(3)
+
+#from pyspark.ml.regression import LinearRegression
+
+#lr = LinearRegression(featuresCol = 'feaes', labelCol='MV', maxIter=10, regParam=0.3, elasticNetParam=0.8)
+#lr_model = lr.fit(train_df)
+#print("Coefficients: " + str(lr_model.coefficients))
+#print("Intercept: " + str(lr_model.intercept))
 
 
 
