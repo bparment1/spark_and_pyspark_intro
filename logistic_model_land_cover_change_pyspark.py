@@ -4,16 +4,15 @@ Spyder Editor.
 """
 #################################### Land Use and Land Cover Change #######################################
 ############################ Analyze Land Cover change in Houston #######################################
-#This script performs analyses to test pyspark to predict land change in Houston.
+#This script performs analyses to test pyspark g aggregated NLCD values.
 #The goal is to assess land cover change using two land cover maps in the Houston areas.
 #Additional datasets are provided for the land cover change modeling. A model is built for Harris county.
-#A logistic model is fitted using ml from pyspark
 #
 #AUTHORS: Benoit Parmentier
 #DATE CREATED: 01/07/2019
-#DATE MODIFIED: 04/12/2019
+#DATE MODIFIED: 04/18/2019
 #Version: 1
-#PROJECT: Research Support
+#PROJECT: AAG 2019 Geospatial Short Course
 #TO DO:
 #
 #COMMIT: changes to modeling
@@ -99,14 +98,10 @@ random_seed = 100 #random seed for reproducibility
 
 ################# START SCRIPT ###############################
 
+
 ## seting up SPARK
 sc= SparkContext()
 sqlContext = SQLContext(sc)
-#https://www.guru99.com/pyspark-tutorial.html
-#dataset = pd.read_csv("data/AS/test_v2.csv")
-#sc = SparkContext(conf=conf)
-#sqlCtx = SQLContext(sc)
-#sdf = sqlCtx.createDataFrame(dataset)
 
 ######### PART 0: Set up the output dir ################
 
@@ -164,49 +159,6 @@ freq_val_df = data_df[selected_categorical_var_names].apply(pd.value_counts)
 print(freq_val_df.head())
 values_cat = array(data_df[selected_categorical_var_names].values) #note this is assuming only one cat val here
 
-label_encoder = LabelEncoder()  # labeling categories
-one_hot_encoder = OneHotEncoder(sparse=False) #generate dummy variables
-### First integer encode:
-integer_encoded = label_encoder.fit_transform(values_cat)
-print(integer_encoded)
-# Binary encode:
-integer_encoded = integer_encoded.reshape(len(integer_encoded),1)
-print(integer_encoded)
-
-#33 generate dummy variables
-onehot_encoded = one_hot_encoder.fit_transform(integer_encoded)
-print(onehot_encoded)
-onehot_encoded.shape
-type(onehot_encoded)
-
-#Check values generated: invert to check value?
-onehot_encoded[0:5,]
-values_cat[0:5,]
-inverted = label_encoder.inverse_transform([np.argmax(onehot_encoded[1,:])])
-print(inverted)
-
-#assign back to the data.frame
-unique_val = np.array(freq_val_df.index)
-unique_val = np.sort(unique_val)
-print(unique_val)
-names_cat = ['lc_' + str(i) for i in unique_val]
-print(names_cat)
-onehot_encoded_df = pd.DataFrame(onehot_encoded,columns=names_cat)
-onehot_encoded_df.columns
-onehot_encoded_df.head()
-onehot_encoded_df.shape
-data_df.shape
-
-## Add the new encoded variables to the data frame
-data_df= pd.concat([data_df,onehot_encoded_df],sort=False,axis=1)
-data_df.shape
-data_df.head()
-
-selected_covariates_names_updated = selected_continuous_var_names + names_cat 
-
-##############
-## Step 2: Split training and testing and rescaling for continuous variables
-
 ##############
 ## Step 2: Split training and testing and rescaling for continuous variables
 
@@ -246,55 +198,101 @@ X_y_training_df = pd.DataFrame(np.concatenate((X_training_df.values,y_train),axi
                                             columns=list(X_training_df)+['change'])
 
 training_spark_df = sqlContext.createDataFrame(X_y_training_df)
-training_spark_df
+
 #https://www.guru99.com/pyspark-tutorial.html
 #https://towardsdatascience.com/building-a-linear-regression-with-pyspark-and-mllib-d065c3ba246a
 
-vectorAssembler = VectorAssembler(inputCols = list(X_training_df), 
+vectorAssembler = VectorAssembler(inputCols = selected_covariates_names, 
                                   outputCol = 'features')
 vtraining_df = vectorAssembler.transform(training_spark_df)
-vtraining_df = vtraining_df.select(['features', 'change'])
-vtraining_df.show(3)
+
+vectorAssembler = VectorAssembler(inputCols = ['CRIM', 'ZN', 'INDUS', 'CHAS', 'NOX', 'RM', 'AGE', 'DIS', 'RAD', 'TAX', 'PT', 'B', 'LSTAT'],
+                                  outputCol = 'features')
+vhouse_df = vectorAssembler.transform(house_df)
+vhouse_df = vhouse_df.select(['features', 'MV'])
+vhouse_df.show(3)
+
+
+from pyspark.ml.regression import LinearRegression
+
+lr = LinearRegression(featuresCol = 'features', labelCol='MV', maxIter=10, regParam=0.3, elasticNetParam=0.8)
+lr_model = lr.fit(train_df)
+print("Coefficients: " + str(lr_model.coefficients))
+print("Intercept: " + str(lr_model.intercept))
+
+#https://www.guru99.com/pyspark-tutorial.html
+#dataset = pd.read_csv("data/AS/test_v2.csv")
+#sc = SparkContext(conf=conf)
+sqlCtx = SQLContext(sc)
+sdf = sqlCtx.createDataFrame(dataset)
 
 # Load training data
+training = spark.read.format("libsvm").load("data/mllib/sample_libsvm_data.txt")
 
-lr = LogisticRegression(featuresCol='features',labelCol='change',maxIter=10, regParam=0.3, elasticNetParam=0.8)
+lr = LogisticRegression(maxIter=10, regParam=0.3, elasticNetParam=0.8)
+
+featuresCol = 'features', labelCol='MV'
 
 # Fit the model
-lrModel = lr.fit(vtraining_df)
+lrModel = lr.fit(training)
+lfModel = lr.fit(X_train.values,y_train.values.ravel())
 
-print("Coefficients: " + str(lrModel.coefficients))
-print("Intercept: " + str(lrModel.intercept))
+model_logistic = LogisticRegression() #instantiate model object
+model_logistic = model_logistic.fit(X_train.values,y_train.values.ravel())
 
+print("model coefficients: ",model_logistic.coef_)
+selected_covariates_names_updated
 
-#  File "/usr/local/lib/python3.5/dist-packages/py4j/protocol.py", line 328, in get_return_value
-#    format(target_id, ".", name), value)#
+pred_test_prob = model_logistic.predict_proba(X_test.values)
+y_scores_test = pred_test_prob[:,1]
+pred_train_prob = model_logistic.predict_proba(X_train.values)
+y_scores_train = pred_train_prob[:,1]
 
-#Py4JJavaError: An error occurred while calling o272.fit.
-#: org.apache.spark.SparkException: Job aborted due to stage failure: Task 0 in stage 2.0 failed 1 times, most recent failure: Lost task 0.0 in stage 2.0 (TID 2, localhost, executor driver): org.apache.spark.api.python.PythonException: Traceback (most recent call last):
-#  File "/usr/local/lib/python3.5/dist-packages/pyspark/python/lib/pyspark.zip/pyspark/worker.py", line 267, in main
-#    ("%d.%d" % sys.version_info[:2], version))
-#Exception: Python in worker has different version 2.7 than that in driver 3.5, PySpark cannot run with different minor versions.
-#Please check environment variables PYSPARK_PYTHON and PYSPARK_DRIVER_PYTHON are correctly set.
+### Note that we only have about 10% change in the dataset so setting 50% does not make sense!!
+sum(data_df.change)/data_df.shape[0]
+sum(y_train.change)/y_train.shape[0]
+sns.set(color_codes=True) #improves layout with bar and background grid
+sns.countplot(x='change',data=data_df)
+plt.show()
+plt.savefig('count_plot')
 
+# Explore values distribution
+f, ax = plt.subplots(1, 2)
+sns.distplot(y_scores_train,ax=ax[0])#title='January residuals')
+sns.distplot(y_scores_test,ax=ax[1])#title='January residuals')
+ax[0].set(title="Predicted training probabilities") 
+ax[1].set(title="Predicted testing probabilities") 
+
+####################
+###### Step 2: Model assessment with ROC and AUC
+
+#Compute AUC
+auc_val_train =roc_auc_score(y_train,y_scores_train)
+auc_val_test =roc_auc_score(y_test,y_scores_test)
+
+print("AUC train: ", auc_val_train)
+print("AUC test: ", auc_val_test)
+
+#Generate inputs for ROC curves
+fpr, tpr, thresholds = roc_curve(y_test, 
+                                 y_scores_test)
+plt.figure()
+plt.plot(fpr, tpr, 
+         label='Logistic Regression (area = %0.2f)' % auc_val_test)
+plt.plot([0, 1], [0, 1],'r--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Test ROC')
+plt.legend(loc="lower right")
+plt.savefig('Log_ROC')
+plt.show()
 
 ###################### END OF SCRIPT #####################
 
 
-#training = spark.read.format("libsvm").load("data/mllib/sample_libsvm_data.txt")
 
-#vectorAssembler = VectorAssembler(inputCols = ['CRIM', 'ZN', 'INDUS', 'CHAS', 'NOX', 'RM', 'AGE', 'DIS', 'RAD', 'TAX', 'PT', 'B', 'LSTAT'],
-#                                  outputCol = 'features')
-#vhouse_df = vectorAssembler.transform(house_df)
-#vhouse_df = vhouse_df.select(['features', 'MV'])
-#vhouse_df.show(3)
-
-#from pyspark.ml.regression import LinearRegression
-
-#lr = LinearRegression(featuresCol = 'feaes', labelCol='MV', maxIter=10, regParam=0.3, elasticNetParam=0.8)
-#lr_model = lr.fit(train_df)
-#print("Coefficients: " + str(lr_model.coefficients))
-#print("Intercept: " + str(lr_model.intercept))
 
 
 
