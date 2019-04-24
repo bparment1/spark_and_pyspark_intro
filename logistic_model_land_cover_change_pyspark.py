@@ -233,7 +233,7 @@ vtraining_df = vectorAssembler.transform(training_spark_df)
 #vhouse_df = vectorAssembler.transform(house_df)
 #vhouse_df = vhouse_df.select(['features', 'MV'])
 #vhouse_df.show(3)
-
+vtraining_df.show(3)
 
 from pyspark.ml.regression import LinearRegression
 
@@ -252,6 +252,9 @@ print("Intercept: " + str(lr_model.intercept))
 #training = spark.read.format("libsvm").load("data/mllib/sample_libsvm_data.txt")
 
 lr = LogisticRegression(maxIter=10, regParam=0.3, elasticNetParam=0.8)
+
+### Need to add the labels
+#https://docs.databricks.com/spark/latest/mllib/binary-classification-mllib-pipelines.html
 
 #featuresCol = 'features', labelCol='MV'
 
