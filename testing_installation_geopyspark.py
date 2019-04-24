@@ -12,7 +12,11 @@ from shapely.geometry import box
 
 # Create the SparkContext
 conf = gps.geopyspark_conf(appName="geopyspark-example", master="local[*]")
-sc = SparkContext(conf=conf)
+#sc = SparkContext(conf=conf) #already exists changebelow
+
+sc = SparkContext.getOrCreate(conf)
+sqlContext = SQLContext(sc)
+
 
 # Read in the NLCD tif that has been saved locally.
 # This tif represents the state of Pennsylvania.
