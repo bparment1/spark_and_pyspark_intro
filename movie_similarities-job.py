@@ -1,10 +1,35 @@
+#################################### Pyspark running cluster job #######################################
+######################## running cluster jobs using moving rating #######################################
+#This script is modified from Frank Kane course at udemy.
+#The goal is to show an example of spark-submit job on a local cluster and using yarn. 
+#
+#AUTHORS: Frank Kane, modified by Benoit Parmentier
+#DATE CREATED: unkown
+#DATE MODIFIED: 08/08/2019
+#Version: 1
+#PROJECT: spark scaling up
+#TO DO:
+#
+#COMMIT: clean up code for workshop
+#
+#################################################################################################
+
+###### Library used in this script
+
 import sys
 from pyspark import SparkConf, SparkContext
 from math import sqrt
+import os 
 
-def loadMovieNames():
+################ NOW FUNCTIONS  ###################
+
+##------------------
+# Functions used in the script
+##------------------
+
+def loadMovieNames(in_filename):
     movieNames = {}
-    with open("ml-100k/u.ITEM", encoding='ascii', errors='ignore') as f:
+    with open(in_filename, encoding='ascii', errors='ignore') as f:
         for line in f:
             fields = line.split('|')
             movieNames[int(fields[0])] = fields[1]
@@ -42,14 +67,29 @@ def computeCosineSimilarity(ratingPairs):
 
     return (score, numPairs)
 
+############################################################################
+#####  Parameters and argument set up ###########
 
-conf = SparkConf().setMaster("local[*]").setAppName("MovieSimilarities")
+#ARGS 1
+in_dir = "/home/bparmentier/Data/google_drive/Data/spark/movie_similarity_application/data/ml-100k"
+#ARGS 2
+out_dir = "/home/bparmentier/Data/google_drive/Data/spark/movie_similarity_application/outputs"
+#ARGS3
+infile_name = "u.data"
+infile_name_movie_name = "u.item"
+
+os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
+
+
+conf = SparkConf().setMaster("local[*]").setAppName("MovieSimilarities") #treat cores as cluster on your local machine
 sc = SparkContext(conf = conf)
 
 print("\nLoading movie names...")
-nameDict = loadMovieNames()
+nameDict = loadMovieNames(os.path.join(in_dir,infile_name_movie_name))
 
-data = sc.textFile("file:///SparkCourse/ml-100k/u.data")
+in_file = os.path.join(in_dir,infile_name)
+data = sc.textFile(in_file) 
+#type(data) #this is pyspark.rdd.RDD
 
 # Map ratings to key / value pairs: user ID => movie ID, rating
 ratings = data.map(lambda l: l.split()).map(lambda l: (int(l[0]), (int(l[1]), float(l[2]))))
@@ -84,6 +124,7 @@ if (len(sys.argv) > 1):
     scoreThreshold = 0.97
     coOccurenceThreshold = 50
 
+    movieID=50
     movieID = int(sys.argv[1])
 
     # Filter for movies with this sim that are "good" as defined by
@@ -103,3 +144,6 @@ if (len(sys.argv) > 1):
         if (similarMovieID == movieID):
             similarMovieID = pair[1]
         print(nameDict[similarMovieID] + "\tscore: " + str(sim[0]) + "\tstrength: " + str(sim[1]))
+
+
+################################ End of script #########################################
