@@ -10,11 +10,8 @@
 #PROJECT: spark scaling up
 #TO DO:
 #
-#COMMIT: testing reading from AWS s3 storage
-
-# Notes: To submit jobs use: "spark-submit movie-similarities_08082019c.py 50"
-#To check SPARK JOBS: http://localhost:4040/jobs/
-
+#COMMIT: clean up code for workshop
+#
 #################################################################################################
 
 ###### Library used in this script
@@ -74,9 +71,6 @@ def computeCosineSimilarity(ratingPairs):
 #####  Parameters and argument set up ###########
 
 #ARGS 1
-#s3://recommendation-movie/ml-100k/u.data
-#s3://recommendation-movie/ml-100k/u.item
-#in_dir = 's3://recommendation-movie/ml-100k'
 in_dir = "/home/bparmentier/Data/google_drive/Data/spark/movie_similarity_application/data/ml-100k"
 #ARGS 2
 out_dir = "/home/bparmentier/Data/google_drive/Data/spark/movie_similarity_application/outputs"
@@ -84,7 +78,8 @@ out_dir = "/home/bparmentier/Data/google_drive/Data/spark/movie_similarity_appli
 infile_name = "u.data"
 infile_name_movie_name = "u.item"
 
-#os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
+os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
+
 conf = SparkConf().setMaster("local[*]").setAppName("MovieSimilarities") #treat cores as cluster on your local machine
 sc = SparkContext(conf = conf)
 
@@ -128,7 +123,7 @@ if (len(sys.argv) > 1):
     scoreThreshold = 0.97
     coOccurenceThreshold = 50
 
-    #movieID=50
+    movieID=50
     movieID = int(sys.argv[1])
 
     # Filter for movies with this sim that are "good" as defined by
